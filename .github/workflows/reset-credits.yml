@@ -1,0 +1,16 @@
+name: Reset User Credits
+
+on:
+  schedule:
+    - cron: '0 0 * * *' # Runs daily at midnight UTC
+  workflow_dispatch: # Allows manual trigger from GitHub UI
+
+jobs:
+  reset-credits:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Trigger Reset Credits API
+        run: |
+          curl -X POST "${{ secrets.SECUREBUDDY_API_URL }}/api/system/reset-credits" \
+            -H "x-api-key: ${{ secrets.SECUREBUDDY_CRON_SECRET }}" \
+            -H "Content-Type: application/json"
