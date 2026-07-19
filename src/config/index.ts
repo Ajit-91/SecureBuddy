@@ -22,7 +22,7 @@ export const config = {
     apiKey: process.env.GEMINI_API_KEY || "",
   },
   system: {
-    cronSecret: process.env.CRON_SECRET || "",
+    cronSecret: process.env.RESET_CREDIT_CRON_SECRET || "",
   },
 };
 

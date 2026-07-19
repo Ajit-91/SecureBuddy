@@ -12,5 +12,5 @@ jobs:
       - name: Trigger Reset Credits API
         run: |
           curl -X POST "${{ secrets.SECUREBUDDY_API_URL }}/api/system/reset-credits" \
-            -H "x-api-key: ${{ secrets.SECUREBUDDY_CRON_SECRET }}" \
+            -H "x-api-key: ${{ secrets.RESET_CREDIT_CRON_SECRET }}" \
             -H "Content-Type: application/json"
