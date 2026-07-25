@@ -58,7 +58,7 @@ async function startServer() {
       logger.info(`SecureBuddy API Server running on port ${config.port} in [${config.nodeEnv}] mode`);
     });
 
-    // 4. Start Bot in Polling Mode if configured
+    // 4. Start Bot in Polling/Webhook Mode
     if (config.bot.mode === "polling") {
       if (config.bot.token && config.bot.token !== "YOUR_TELEGRAM_BOT_TOKEN") {
         // Start polling asynchronously so it doesn't block server startup
@@ -72,6 +72,21 @@ async function startServer() {
         });
       } else {
         logger.warn("Telegram bot token not provided or is placeholder. Long polling disabled.");
+      }
+    } else if (config.bot.mode === "webhook") {
+      if (config.bot.token && config.bot.token !== "YOUR_TELEGRAM_BOT_TOKEN") {
+        if (config.bot.appUrl) {
+          try {
+            const webhookUrl = `${config.bot.appUrl.replace(/\/$/, "")}/bot${config.bot.token}`;
+            logger.info(`Setting Telegram Webhook to: ${webhookUrl}`);
+            await bot.api.setWebhook(webhookUrl);
+            logger.info("Telegram Webhook set successfully.");
+          } catch (err) {
+            logger.error("Failed to set Telegram Webhook:", err);
+          }
+        } else {
+          logger.warn("BOT_MODE is webhook but APP_URL is not configured. Webhook registration skipped.");
+        }
       }
     }
   } catch (error) {

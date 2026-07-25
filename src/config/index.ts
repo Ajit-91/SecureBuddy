@@ -10,6 +10,7 @@ export const config = {
   bot: {
     token: process.env.TELEGRAM_BOT_TOKEN || "",
     mode: process.env.BOT_MODE || "polling", // polling or webhook
+    appUrl: process.env.APP_URL || "",
   },
   mongo: {
     uri: process.env.MONGO_URI || "mongodb://localhost:27017/securebuddy",
