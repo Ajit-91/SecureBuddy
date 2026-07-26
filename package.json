@@ -6,12 +6,16 @@
   "scripts": {
     "build": "tsc",
     "start": "node dist/server.js",
-    "dev": "ts-node-dev --respawn --transpile-only src/server.ts"
+    "dev": "ts-node-dev --respawn --transpile-only src/server.ts",
+    "worker:dev": "ts-node-dev --respawn --transpile-only src/workerEntry.ts",
+    "worker:start": "node dist/workerEntry.js",
+    "startdev": "start npm run dev && start npm run worker:dev"
   },
   "keywords": [],
   "author": "",
   "license": "ISC",
   "dependencies": {
+    "@google/genai": "^2.13.0",
     "bullmq": "^5.8.2",
     "dotenv": "^16.4.5",
     "express": "^4.19.2",

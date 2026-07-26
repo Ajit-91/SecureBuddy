@@ -5,11 +5,11 @@ export async function helpHandler(ctx: BotContext): Promise<void> {
 
 Here are the available commands:
 
-/start \- Start the bot and get welcome info
-/help \- Show this help message
-/credits \- View your remaining daily analysis credits
-/history \- View history of past analyses
-/report <jobId> \- Fetch report details for a specific analysis
+/start - Start the bot and get welcome info
+/help - Show this help message
+/credits - View your remaining daily analysis credits
+/history - View history of past analyses
+/report <jobId> - Fetch report details for a specific analysis
 
 *How to analyze:*
 • *Send a URL*: Simply type or paste any link (e.g. \`https://example.com\`)
@@ -17,7 +17,7 @@ Here are the available commands:
 
 Each analysis costs *1 credit*. All analysis is run inside isolated Docker containers.`;
 
-  await ctx.reply(helpMessage, { parse_mode: "MarkdownV2" });
+  await ctx.reply(helpMessage, { parse_mode: "Markdown" });
 }
 
 export default helpHandler;
