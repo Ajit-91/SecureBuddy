@@ -11,7 +11,7 @@ jobs:
     steps:
       - name: Trigger Sandbox Cleanup Endpoint
         run: |
-          curl -X POST "${{ secrets.SECUREBUDDY_APP_URL }}/api/system/cleanup-sandboxes" \
+          curl -X POST "${{ secrets.SECUREBUDDY_API_URL }}/api/system/cleanup-sandboxes" \
             -H "Authorization: Bearer ${{ secrets.CRON_SECRET }}" \
             -H "Content-Type: application/json" \
             --fail

@@ -24,7 +24,7 @@ export const config = {
     apiKey: process.env.GEMINI_API_KEY || "",
   },
   system: {
-    cronSecret: process.env.RESET_CREDIT_CRON_SECRET || "",
+    cronSecret: process.env.CRON_SECRET || "",
   },
   sandbox: {
     expiryMinutes: parseInt(process.env.SANDBOX_EXPIRY_MINUTES || "60", 10),
