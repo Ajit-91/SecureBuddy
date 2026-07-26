@@ -6,7 +6,9 @@ import { connectDatabase, disconnectDatabase } from "./config/database";
 import { bot } from "./bot";
 import { webhookCallback } from "grammy";
 import { resetAllUserCredits } from "./cron/resetCredits";
+import { queueSandboxCleanup } from "./cron/cleanupSandboxes";
 import { closeQueues } from "./queues";
+import SandboxSession from "./models/SandboxSession";
 
 const app = express();
 app.use(express.json());
@@ -14,6 +16,41 @@ app.use(express.json());
 // Basic health check endpoint
 app.get("/health", (req, res) => {
   res.status(200).json({ status: "OK", timestamp: new Date() });
+});
+
+// VNC Session Redirect Endpoint
+app.get("/session/:token", async (req, res) => {
+  const token = req.params.token;
+  try {
+    const session = await SandboxSession.findOne({
+      sessionToken: token,
+      status: "active",
+      expiresAt: { $gt: new Date() },
+    });
+
+    if (!session) {
+      res.status(404).send(
+        `<h2>Session Expired or Not Found</h2>` +
+          `<p>The interactive sandbox session has expired or does not exist.</p>`
+      );
+      return;
+    }
+
+    if (!session.port) {
+      res.status(503).send(
+        `<h2>Sandbox Initializing</h2>` +
+          `<p>The sandbox container is still booting. Please refresh in a few seconds.</p>`
+      );
+      return;
+    }
+
+    const redirectUrl = `http://${req.hostname}:${session.port}`;
+    logger.info(`Redirecting session token [${token}] to VNC on ${redirectUrl}`);
+    res.redirect(redirectUrl);
+  } catch (error) {
+    logger.error(`Error redirecting session ${token}:`, error);
+    res.status(500).send("<h2>Internal Server Error</h2>");
+  }
 });
 
 app.get("/", (req, res) => {
@@ -46,6 +83,26 @@ app.post("/api/system/reset-credits", async (req, res) => {
   }
 });
 
+// Secured System Endpoint for Sandbox Cleanup (triggered via external Scheduler)
+app.post("/api/system/cleanup-sandboxes", async (req, res) => {
+  const requestKey = req.headers["x-api-key"] || req.headers["authorization"]?.replace("Bearer ", "");
+  const configKey = config.system.cronSecret;
+
+  if (!configKey || requestKey !== configKey) {
+    logger.warn("Unauthorized sandbox cleanup request attempted");
+    res.status(401).json({ error: "Unauthorized" });
+    return;
+  }
+
+  try {
+    await queueSandboxCleanup();
+    res.status(200).json({ success: true, message: "Sandbox cleanup job queued successfully" });
+  } catch (error) {
+    logger.error("Failed to execute sandbox cleanup trigger:", error);
+    res.status(500).json({ error: "Internal Server Error" });
+  }
+});
+
 let server: http.Server;
 
 async function startServer() {
@@ -63,7 +120,7 @@ async function startServer() {
       if (config.bot.token && config.bot.token !== "YOUR_TELEGRAM_BOT_TOKEN") {
         // Start polling asynchronously so it doesn't block server startup
         bot.start({
-          allowed_updates: ["message"],
+          allowed_updates: ["message", "callback_query"],
           onStart: (botInfo) => {
             logger.info(`Grammy Bot @${botInfo.username} started successfully via long polling`);
           },

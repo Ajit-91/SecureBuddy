@@ -195,225 +195,95 @@ AI Summary
 
 ---
 
-# Phase 3 — Document Analysis
+# Phase 3 — URL Interactive Sandbox
 
 ## Objective
 
-Analyze uploaded documents safely.
-
----
-
-## Supported Formats
-
-```text id="4hcbz6"
-PDF
-DOCX
-TXT
-```
-
----
-
-## Features
-
-### Metadata Extraction
-
-Examples:
-
-* Author
-* Creation date
-* Modification date
-
----
-
-### Content Extraction
-
-Extract readable text.
-
----
-
-### Suspicious Indicator Detection
-
-Examples:
-
-* Embedded links
-* External references
-* Suspicious keywords
-
----
-
-### AI Summary
-
-Generate:
-
-* Summary
-* Findings
-* Risk explanation
-
----
-
-## Deliverables
-
-Document Security Reports.
-
----
-
-# Phase 4 — ZIP Analysis
-
-## Objective
-
-Inspect compressed archives.
-
----
-
-## Features
-
-### Archive Extraction
-
-Extract archive contents.
-
----
-
-### Nested Archive Detection
-
-Examples:
-
-```text id="xocls6"
-archive.zip
- └─ files.zip
-     └─ content.zip
-```
-
----
-
-### Dangerous File Detection
-
-Examples:
-
-```text id="pjdzjz"
-.exe
-.bat
-.cmd
-.ps1
-.js
-.vbs
-```
-
----
-
-### Archive Statistics
-
-Generate:
-
-* File count
-* File types
-* Nested depth
-
----
-
-### AI Summary
-
-Generate findings and risk explanation.
-
----
-
-## Deliverables
-
-ZIP Security Reports.
-
----
-
-# Phase 5 — APK Static Analysis
-
-## Objective
-
-Perform Android application static analysis.
+Allow users to safely explore and interact with scanned URLs in an isolated sandbox environment.
 
 ---
 
 ## Technologies
 
-* JADX
-* APKTool
+* Docker
+* VNC
+* noVNC
+* Chromium (with VNC capability)
+
+---
+
+## User Flow
+
+URL analysis completes.
+
+↓
+
+Bot displays inline button:
+
+```text id="button_vnc"
+[Launch Sandbox]
+```
+
+↓
+
+User clicks button.
+
+↓
+
+Sandbox environment starts.
+
+↓
+
+Temporary session URL generated.
 
 ---
 
 ## Features
 
-### Manifest Extraction
+### Browser Container Creation
 
-Extract:
-
-```text id="1j7ayr"
-AndroidManifest.xml
-```
+Spawn a background, isolated browser container (e.g. Chromium VNC).
 
 ---
 
-### Permission Analysis
+### URL Auto-Navigation
 
-Examples:
-
-```text id="2kvh22"
-READ_SMS
-READ_CONTACTS
-ACCESS_FINE_LOCATION
-```
+Auto-navigate the sandbox browser to the analyzed URL on startup.
 
 ---
 
-### Component Extraction
+### Session Management
 
-Extract:
-
-* Activities
-* Services
-* Receivers
-* Providers
+Generate a temporary token-based session link.
 
 ---
 
-### URL Extraction
+### Interactive Exploration
 
-Identify:
-
-* Domains
-* Endpoints
-* API URLs
+Allow safe interactions (clicks, scrolling, typing) through the browser.
 
 ---
 
-### Certificate Information
+### Session Expiration
 
-Extract signing details.
-
----
-
-### Security Findings
-
-Examples:
-
-* Dangerous permissions
-* Excessive permissions
-* Embedded URLs
+Auto-terminate sessions after 30 minutes.
 
 ---
 
-### Gemini Summary
+### Cleanup
 
-Generate:
-
-* Risk explanation
-* Recommendations
+Automatically stop containers and mark sessions expired.
 
 ---
 
 ## Deliverables
 
-APK Security Reports.
+Secure browser-based URL sandbox streaming.
 
 ---
 
-# Phase 6 — APK Interactive Sandbox
+
+# Phase 4 — APK Interactive Sandbox
 
 ## Objective
 
@@ -516,3 +386,223 @@ Automatically:
 Secure browser-based APK testing.
 
 ---
+
+# Phase 5 — APK Static Analysis
+
+## Objective
+
+Perform Android application static analysis.
+
+---
+
+## Technologies
+
+* JADX
+* APKTool
+
+---
+
+## Features
+
+### Manifest Extraction
+
+Extract:
+
+```text id="1j7ayr"
+AndroidManifest.xml
+```
+
+---
+
+### Permission Analysis
+
+Examples:
+
+```text id="2kvh22"
+READ_SMS
+READ_CONTACTS
+ACCESS_FINE_LOCATION
+```
+
+---
+
+### Component Extraction
+
+Extract:
+
+* Activities
+* Services
+* Receivers
+* Providers
+
+---
+
+### URL Extraction
+
+Identify:
+
+* Domains
+* Endpoints
+* API URLs
+
+---
+
+### Certificate Information
+
+Extract signing details.
+
+---
+
+### Security Findings
+
+Examples:
+
+* Dangerous permissions
+* Excessive permissions
+* Embedded URLs
+
+---
+
+### Gemini Summary
+
+Generate:
+
+* Risk explanation
+* Recommendations
+
+---
+
+## Deliverables
+
+APK Security Reports.
+
+---
+
+
+# Phase 6 — Document Analysis
+
+## Objective
+
+Analyze uploaded documents safely.
+
+---
+
+## Supported Formats
+
+```text id="4hcbz6"
+PDF
+DOCX
+TXT
+```
+
+---
+
+## Features
+
+### Metadata Extraction
+
+Examples:
+
+* Author
+* Creation date
+* Modification date
+
+---
+
+### Content Extraction
+
+Extract readable text.
+
+---
+
+### Suspicious Indicator Detection
+
+Examples:
+
+* Embedded links
+* External references
+* Suspicious keywords
+
+---
+
+### AI Summary
+
+Generate:
+
+* Summary
+* Findings
+* Risk explanation
+
+---
+
+## Deliverables
+
+Document Security Reports.
+
+---
+
+# Phase 7 — ZIP Analysis
+
+## Objective
+
+Inspect compressed archives.
+
+---
+
+## Features
+
+### Archive Extraction
+
+Extract archive contents.
+
+---
+
+### Nested Archive Detection
+
+Examples:
+
+```text id="xocls6"
+archive.zip
+ └─ files.zip
+     └─ content.zip
+```
+
+---
+
+### Dangerous File Detection
+
+Examples:
+
+```text id="pjdzjz"
+.exe
+.bat
+.cmd
+.ps1
+.js
+.vbs
+```
+
+---
+
+### Archive Statistics
+
+Generate:
+
+* File count
+* File types
+* Nested depth
+
+---
+
+### AI Summary
+
+Generate findings and risk explanation.
+
+---
+
+## Deliverables
+
+ZIP Security Reports.
+
+---
+

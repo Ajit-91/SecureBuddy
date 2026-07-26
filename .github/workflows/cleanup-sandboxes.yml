@@ -1,0 +1,17 @@
+name: Trigger Sandbox Cleanup
+
+on:
+  schedule:
+    - cron: '0 */1 * * *' # Runs every 60 minutes (1 hour)
+  workflow_dispatch: # Allows manual trigger from GitHub UI
+
+jobs:
+  cleanup:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Trigger Sandbox Cleanup Endpoint
+        run: |
+          curl -X POST "${{ secrets.SECUREBUDDY_APP_URL }}/api/system/cleanup-sandboxes" \
+            -H "Authorization: Bearer ${{ secrets.CRON_SECRET }}" \
+            -H "Content-Type: application/json" \
+            --fail

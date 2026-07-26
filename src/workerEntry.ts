@@ -1,5 +1,8 @@
+import config from "./config";
 import { connectDatabase, disconnectDatabase } from "./config/database";
 import { urlWorker } from "./workers/url.worker";
+import { sandboxWorker } from "./workers/sandbox.worker";
+import { cleanupExpiredSandboxSessions } from "./services/sandbox.service";
 import { closeQueues } from "./queues";
 import logger from "./shared/logger";
 
@@ -11,14 +14,31 @@ async function startWorkerProcess() {
     logger.info("Worker DB connection initialized successfully.");
 
     // 2. Importing worker triggers BullMQ listener to start
-    logger.info(`Active Workers listening: [${urlWorker.name}]`);
+    logger.info(`Active Workers listening: [${urlWorker.name}, ${sandboxWorker.name}]`);
+
+    // 3. Start periodic expired sandbox session cleanup (every 60 seconds) in development environment
+    let cleanupInterval: NodeJS.Timeout | undefined;
+    if (config.nodeEnv !== "production") {
+      logger.info("Initializing local sandbox cleanup interval (Development mode)...");
+      cleanupInterval = setInterval(async () => {
+        try {
+          await cleanupExpiredSandboxSessions();
+        } catch (err) {
+          logger.error("Error running sandbox cleanup interval:", err);
+        }
+      }, 60000);
+    } else {
+      logger.info("Local sandbox cleanup interval disabled (Production mode). Sandbox cleanup will be triggered externally via HTTP cron endpoint.");
+    }
 
     // Handle graceful shutdown signals
     const handleShutdown = async (signal: string) => {
       logger.info(`Received ${signal}. Shutting down worker process...`);
       try {
         logger.info("Closing workers...");
+        if (cleanupInterval) clearInterval(cleanupInterval);
         await urlWorker.close();
+        await sandboxWorker.close();
         
         logger.info("Closing queues...");
         await closeQueues();

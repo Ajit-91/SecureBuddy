@@ -157,6 +157,26 @@ ${escapedSummary}
         await bot.api.sendMessage(chatId, reportText, { parse_mode: "HTML" });
       }
 
+      // Send VNC sandbox invitation message
+      await bot.api.sendMessage(
+        chatId,
+        `💻 <b>Interactive Sandbox Available</b>\n\n` +
+          `You can safely browse and explore this URL inside a containerized sandbox environment.`,
+        {
+          parse_mode: "HTML",
+          reply_markup: {
+            inline_keyboard: [
+              [
+                {
+                  text: "🚀 Launch Sandbox",
+                  callback_data: `launch_sandbox:${jobId}`,
+                },
+              ],
+            ],
+          },
+        }
+      );
+
     } catch (error: any) {
       logger.error(`URL Analysis failed for job ${jobId}:`, error.message);
       

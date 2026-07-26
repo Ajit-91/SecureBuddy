@@ -26,6 +26,9 @@ export const config = {
   system: {
     cronSecret: process.env.RESET_CREDIT_CRON_SECRET || "",
   },
+  sandbox: {
+    expiryMinutes: parseInt(process.env.SANDBOX_EXPIRY_MINUTES || "60", 10),
+  },
 };
 
 export default config;

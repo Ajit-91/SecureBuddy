@@ -2,9 +2,11 @@ import { Schema, model, Document, Types } from "mongoose";
 
 export interface ISandboxSession extends Document {
   userId: Types.ObjectId;
-  jobId: Types.ObjectId;
+  jobId?: Types.ObjectId;
   containerId: string;
+  targetValue: string;
   sessionToken: string;
+  port?: number;
   expiresAt: Date;
   status: "active" | "expired" | "terminated";
   createdAt: Date;
@@ -22,10 +24,14 @@ const SandboxSessionSchema = new Schema<ISandboxSession>(
     jobId: {
       type: Schema.Types.ObjectId,
       ref: "AnalysisJob",
-      required: true,
+      required: false,
       index: true,
     },
     containerId: {
+      type: String,
+      required: true,
+    },
+    targetValue: {
       type: String,
       required: true,
     },
@@ -34,6 +40,10 @@ const SandboxSessionSchema = new Schema<ISandboxSession>(
       required: true,
       unique: true,
       index: true,
+    },
+    port: {
+      type: Number,
+      required: false,
     },
     expiresAt: {
       type: Date,
