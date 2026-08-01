@@ -1,16 +1,65 @@
 import { Worker } from "bullmq";
 import { Api } from "grammy";
 import crypto from "crypto";
+import https from "https";
+import fs from "fs";
+import path from "path";
+import { exec } from "child_process";
 import redisConnection from "../config/redis";
 import config from "../config";
 import { QUEUES } from "../shared/constants/queues";
 import SandboxSession from "../models/SandboxSession";
 import User from "../models/User";
-import { startSandboxContainer, findFreePort, cleanupExpiredSandboxSessions } from "../services/sandbox.service";
+import AnalysisJob from "../models/AnalysisJob";
+import { startSandboxContainer, stopSandboxContainer, findFreePort, cleanupExpiredSandboxSessions } from "../services/sandbox.service";
+import { createJobTempDir, cleanupJobTempDir } from "../utils/tempFiles";
 import { escapeHtml } from "../utils/escape";
 import logger from "../shared/logger";
 
 const api = new Api(config.bot.token || "dummy_token_for_compilation");
+
+// Helper function to download file from a URL
+function downloadFile(url: string, destPath: string): Promise<void> {
+  return new Promise((resolve, reject) => {
+    const file = fs.createWriteStream(destPath);
+    https.get(url, (response) => {
+      if (response.statusCode !== 200) {
+        reject(new Error(`Failed to download file from ${url}, status code: ${response.statusCode}`));
+        return;
+      }
+      response.pipe(file);
+      file.on("finish", () => {
+        file.close();
+        resolve();
+      });
+    }).on("error", (err) => {
+      fs.unlink(destPath, () => reject(err));
+    });
+  });
+}
+
+// Helper function to poll and wait for Android Emulator to complete boot
+function waitForEmulator(containerId: string, timeoutMs = 120000): Promise<void> {
+  const startTime = Date.now();
+  return new Promise((resolve, reject) => {
+    const checkInterval = setInterval(() => {
+      if (Date.now() - startTime > timeoutMs) {
+        clearInterval(checkInterval);
+        reject(new Error("Timeout waiting for Android Emulator boot completion."));
+        return;
+      }
+
+      // Check if boot is completed
+      exec(`docker exec ${containerId} adb shell getprop sys.boot_completed`, (error, stdout) => {
+        if (!error && stdout.trim() === "1") {
+          clearInterval(checkInterval);
+          logger.info(`Android Emulator in container ${containerId} has successfully booted.`);
+          resolve();
+        }
+      });
+    }, 5000);
+  });
+}
 
 export const sandboxWorker = new Worker(
   QUEUES.SANDBOX_CREATION,
@@ -50,19 +99,121 @@ export const sandboxWorker = new Worker(
         
         // Pass the target URL via CHROME_CLI environment variable so chromium auto-navigates on start
         containerId = await startSandboxContainer(image, port, 3000, [], { CHROME_CLI: inputValue });
+      } else if (type === "apk") {
+        if (!session.jobId) {
+          throw new Error("Sandbox session does not contain a valid jobId.");
+        }
+        const jobRecord = await AnalysisJob.findById(session.jobId);
+        if (!jobRecord || !jobRecord.telegramFileId) {
+          throw new Error(`AnalysisJob record or telegramFileId not found for Job ID ${session.jobId}`);
+        }
+
+        // 1. Create a job temp directory
+        const tempDir = createJobTempDir(String(session.jobId));
+        const localApkPath = path.join(tempDir, "app.apk");
+
+        // 2. Fetch the file path from Telegram and download the file
+        logger.info(`Fetching APK file path from Telegram for File ID: ${jobRecord.telegramFileId}`);
+        const fileInfo = await api.getFile(jobRecord.telegramFileId);
+        if (!fileInfo.file_path) {
+          throw new Error(`Telegram API returned empty file_path for File ID ${jobRecord.telegramFileId}`);
+        }
+        const fileDownloadUrl = `https://api.telegram.org/file/bot${config.bot.token}/${fileInfo.file_path}`;
+        
+        logger.info(`Downloading APK file from Telegram...`);
+        await downloadFile(fileDownloadUrl, localApkPath);
+        logger.info(`APK downloaded successfully to ${localApkPath}`);
+
+        // 3. Determine KVM vs Privileged mode
+        let extraFlags: string[] = [];
+        let emulatorArgs = "-no-audio -no-boot-anim";
+        const hasKvm = fs.existsSync("/dev/kvm");
+        if (hasKvm) {
+          logger.info("KVM device found on host. Exposing /dev/kvm to Android Emulator...");
+          extraFlags.push("--device /dev/kvm", "--cap-add SYS_ADMIN");
+        } else {
+          logger.warn("KVM device not found. Running Android Emulator container in software rendering mode...");
+          extraFlags.push("--privileged");
+          emulatorArgs = "-no-accel -gpu swiftshader_indirect -no-audio -no-boot-anim";
+        }
+
+        // 4. Start the Android Emulator Container
+        const image = "budtmo/docker-android:emulator_9.0";
+        logger.info(`Spawning Android Emulator container on port ${port}...`);
+        
+        containerId = await startSandboxContainer(
+          image,
+          port,
+          6080,
+          [],
+          { 
+            DEVICE: "Samsung Galaxy S6", 
+            WEB_VNC_PORT: "6080",
+            EMULATOR_ARGS: emulatorArgs
+          },
+          extraFlags
+        );
+
+        // 5. Wait for emulator to complete boot
+        logger.info(`Waiting for emulator to boot inside container ${containerId}...`);
+        await waitForEmulator(containerId, 900000);
+
+        // 6. Install the APK
+        logger.info(`Copying APK into emulator container...`);
+        await new Promise<void>((resolve, reject) => {
+          exec(`docker cp "${localApkPath}" ${containerId}:/tmp/app.apk`, (error) => {
+            if (error) reject(new Error(`Failed to copy APK to container: ${error.message}`));
+            else resolve();
+          });
+        });
+
+        logger.info(`Installing APK inside emulator...`);
+        await new Promise<void>((resolve, reject) => {
+          exec(`docker exec ${containerId} adb -e install /tmp/app.apk`, (error, stdout, stderr) => {
+            if (error) reject(new Error(`Failed to install APK inside emulator: ${error.message}. Stderr: ${stderr}`));
+            else {
+              logger.info(`ADB install result: ${stdout.trim()}`);
+              resolve();
+            }
+          });
+        });
+
+        // 7. Clean up local temp folder
+        cleanupJobTempDir(String(session.jobId));
       } else {
-        // Fallback or future placeholder (e.g. for APK Android Emulator)
-        // We will default to a mock container for unsupported types or future phases
-        logger.info(`Sandbox type [${type}] will run in mock container mode.`);
-        containerId = `mock-container-${crypto.randomBytes(8).toString("hex")}`;
+        logger.info(`Sandbox type [${type}] is not supported.`);
+        throw new Error(`Unsupported sandbox type: ${type}`);
       }
     } catch (dockerError: any) {
-      logger.warn(`Docker execution failed, falling back to mock container: ${dockerError.message}`);
-      // Fallback: use a mock container ID and a fallback port
-      containerId = `mock-container-${crypto.randomBytes(8).toString("hex")}`;
-      if (port === 0) {
-        port = 3000 + Math.floor(Math.random() * 1000);
+      logger.error(`Sandbox worker execution failed: ${dockerError.message}`);
+      if (containerId !== "pending" && !containerId.startsWith("mock-")) {
+        logger.info(`Cleaning up failed container: ${containerId}`);
+        await stopSandboxContainer(containerId);
       }
+      
+      session.status = "terminated";
+      await session.save();
+
+      // Notify user of the failure
+      try {
+        const user = await User.findById(userId);
+        if (user && user.telegramId && config.bot.token && config.bot.token !== "YOUR_TELEGRAM_BOT_TOKEN") {
+          let errorDetails = "An internal error occurred while setting up the sandbox environment. Please contact the administrator.";
+          if (dockerError.message.includes("file is too big")) {
+            errorDetails = "The uploaded APK exceeds Telegram's 20MB download limit for standard bots. Please try a smaller APK (under 20MB) or configure a local Telegram Bot API Server.";
+          }
+          await api.sendMessage(
+            user.telegramId,
+            `❌ <b>Sandbox Launch Failed</b>\n\n` +
+              `We could not boot your secure container environment.\n\n` +
+              `• <b>Reason:</b> <code>${escapeHtml(errorDetails)}</code>`,
+            { parse_mode: "HTML" }
+          );
+        }
+      } catch (telegramError) {
+        logger.error("Failed to send sandbox failure message to Telegram:", telegramError);
+      }
+      return;
     }
 
     // Update SandboxSession in database

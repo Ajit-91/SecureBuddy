@@ -6,6 +6,7 @@ web_modules/
 # Build outputs
 dist/
 build/
+temp/
 
 # Environment files
 .env

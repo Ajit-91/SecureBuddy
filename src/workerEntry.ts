@@ -2,6 +2,7 @@ import config from "./config";
 import { connectDatabase, disconnectDatabase } from "./config/database";
 import { urlWorker } from "./workers/url.worker";
 import { sandboxWorker } from "./workers/sandbox.worker";
+import { apkWorker } from "./workers/apk.worker";
 import { cleanupExpiredSandboxSessions } from "./services/sandbox.service";
 import { closeQueues } from "./queues";
 import logger from "./shared/logger";
@@ -14,7 +15,7 @@ async function startWorkerProcess() {
     logger.info("Worker DB connection initialized successfully.");
 
     // 2. Importing worker triggers BullMQ listener to start
-    logger.info(`Active Workers listening: [${urlWorker.name}, ${sandboxWorker.name}]`);
+    logger.info(`Active Workers listening: [${urlWorker.name}, ${sandboxWorker.name}, ${apkWorker.name}]`);
 
     // 3. Start periodic expired sandbox session cleanup (every 60 seconds) in development environment
     let cleanupInterval: NodeJS.Timeout | undefined;
@@ -39,6 +40,7 @@ async function startWorkerProcess() {
         if (cleanupInterval) clearInterval(cleanupInterval);
         await urlWorker.close();
         await sandboxWorker.close();
+        await apkWorker.close();
         
         logger.info("Closing queues...");
         await closeQueues();

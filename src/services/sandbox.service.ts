@@ -55,13 +55,22 @@ export async function startSandboxContainer(
   hostPort: number,
   containerPort: number,
   args: string[] = [],
-  env: Record<string, string> = {}
+  env: Record<string, string> = {},
+  extraFlags: string[] = []
 ): Promise<string> {
   const envFlags = Object.entries(env)
     .map(([key, val]) => `-e ${key}="${val.replace(/"/g, '\\"')}"`)
     .join(" ");
+  
+  const resourceFlags = [
+    `--cpus="${config.sandbox.cpuLimit}"`,
+    `-m "${config.sandbox.memoryLimit}"`,
+    `--network "${config.sandbox.networkMode}"`,
+  ];
+
+  const allFlags = [...resourceFlags, ...extraFlags].join(" ");
   const escapedArgs = args.map((arg) => `"${arg.replace(/"/g, '\\"')}"`).join(" ");
-  const command = `docker run -d --rm -p ${hostPort}:${containerPort} ${envFlags} ${image} ${escapedArgs}`.trim().replace(/\s+/g, " ");
+  const command = `docker run -d --rm -p ${hostPort}:${containerPort} ${allFlags} ${envFlags} ${image} ${escapedArgs}`.trim().replace(/\s+/g, " ");
   logger.info(`Spawning background container: ${command}`);
 
   return new Promise((resolve, reject) => {

@@ -28,6 +28,9 @@ export const config = {
   },
   sandbox: {
     expiryMinutes: parseInt(process.env.SANDBOX_EXPIRY_MINUTES || "60", 10),
+    cpuLimit: process.env.SANDBOX_CPU_LIMIT || "2",
+    memoryLimit: process.env.SANDBOX_MEMORY_LIMIT || "3g",
+    networkMode: process.env.SANDBOX_NETWORK_MODE || "bridge",
   },
 };
 
