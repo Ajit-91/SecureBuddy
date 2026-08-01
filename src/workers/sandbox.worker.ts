@@ -4,7 +4,7 @@ import crypto from "crypto";
 import https from "https";
 import fs from "fs";
 import path from "path";
-import { exec } from "child_process";
+import { exec, execSync } from "child_process";
 import redisConnection from "../config/redis";
 import config from "../config";
 import { QUEUES } from "../shared/constants/queues";
@@ -39,24 +39,115 @@ function downloadFile(url: string, destPath: string): Promise<void> {
 }
 
 // Helper function to poll and wait for Android Emulator to complete boot
-function waitForEmulator(containerId: string, timeoutMs = 120000): Promise<void> {
+function waitForEmulator(
+  containerId: string,
+  timeoutMs = 120000
+): Promise<void> {
   const startTime = Date.now();
+  let logCounter = 0;
+
   return new Promise((resolve, reject) => {
     const checkInterval = setInterval(() => {
+      const elapsed = Math.round(
+        (Date.now() - startTime) / 1000
+      );
+
+      logger.info(
+        `[EMULATOR] Container=${containerId} Elapsed=${elapsed}s`
+      );
+
       if (Date.now() - startTime > timeoutMs) {
         clearInterval(checkInterval);
-        reject(new Error("Timeout waiting for Android Emulator boot completion."));
+
+        logger.error(
+          `[EMULATOR] Boot timeout after ${elapsed}s`
+        );
+
+        exec(
+          `docker logs ${containerId} --tail 200`,
+          (_, stdout, stderr) => {
+            logger.error(
+              `[EMULATOR] Final Container Logs:\n${stdout}`
+            );
+
+            if (stderr) {
+              logger.error(
+                `[EMULATOR] Final Container Errors:\n${stderr}`
+              );
+            }
+          }
+        );
+
+        reject(
+          new Error(
+            "Timeout waiting for Android Emulator boot completion."
+          )
+        );
+
         return;
       }
 
-      // Check if boot is completed
-      exec(`docker exec ${containerId} adb shell getprop sys.boot_completed`, (error, stdout) => {
-        if (!error && stdout.trim() === "1") {
-          clearInterval(checkInterval);
-          logger.info(`Android Emulator in container ${containerId} has successfully booted.`);
-          resolve();
+      exec(
+        `docker exec ${containerId} adb devices`,
+        (_, stdout, stderr) => {
+          logger.info(
+            `[ADB DEVICES]\n${stdout}`
+          );
+
+          if (stderr) {
+            logger.warn(
+              `[ADB STDERR]\n${stderr}`
+            );
+          }
         }
-      });
+      );
+
+      exec(
+        `docker exec ${containerId} adb shell getprop sys.boot_completed`,
+        (error, stdout, stderr) => {
+          if (stderr) {
+            logger.warn(
+              `[BOOT CHECK STDERR] ${stderr}`
+            );
+          }
+
+          logger.info(
+            `[BOOT CHECK] sys.boot_completed="${stdout.trim()}"`
+          );
+
+          if (
+            !error &&
+            stdout.trim() === "1"
+          ) {
+            clearInterval(checkInterval);
+
+            logger.info(
+              `Android Emulator ${containerId} booted successfully after ${elapsed}s`
+            );
+
+            resolve();
+          }
+        }
+      );
+
+      logCounter++;
+
+      if (logCounter % 6 === 0) {
+        exec(
+          `docker logs ${containerId} --tail 100`,
+          (_, stdout, stderr) => {
+            logger.info(
+              `[CONTAINER LOGS]\n${stdout}`
+            );
+
+            if (stderr) {
+              logger.warn(
+                `[CONTAINER STDERR]\n${stderr}`
+              );
+            }
+          }
+        );
+      }
     }, 5000);
   });
 }
@@ -96,7 +187,7 @@ export const sandboxWorker = new Worker(
       if (type === "url") {
         // Chromium image with noVNC exposed on container port 3000
         const image = "lscr.io/linuxserver/chromium:latest";
-        
+
         // Pass the target URL via CHROME_CLI environment variable so chromium auto-navigates on start
         containerId = await startSandboxContainer(image, port, 3000, [], { CHROME_CLI: inputValue });
       } else if (type === "apk") {
@@ -119,7 +210,7 @@ export const sandboxWorker = new Worker(
           throw new Error(`Telegram API returned empty file_path for File ID ${jobRecord.telegramFileId}`);
         }
         const fileDownloadUrl = `https://api.telegram.org/file/bot${config.bot.token}/${fileInfo.file_path}`;
-        
+
         logger.info(`Downloading APK file from Telegram...`);
         await downloadFile(fileDownloadUrl, localApkPath);
         logger.info(`APK downloaded successfully to ${localApkPath}`);
@@ -127,7 +218,18 @@ export const sandboxWorker = new Worker(
         // 3. Determine KVM vs Privileged mode
         let extraFlags: string[] = [];
         let emulatorArgs = "-no-audio -no-boot-anim";
-        const hasKvm = fs.existsSync("/dev/kvm");
+        let hasKvm = false;
+        try {
+          execSync("docker run --rm --device /dev/kvm alpine ls /dev/kvm", { stdio: "ignore" });
+          hasKvm = true;
+        } catch (e) {
+          hasKvm = false;
+        }
+
+        logger.info(
+          `Host KVM available: ${hasKvm}`
+        );
+
         if (hasKvm) {
           logger.info("KVM device found on host. Exposing /dev/kvm to Android Emulator...");
           extraFlags.push("--device /dev/kvm", "--cap-add SYS_ADMIN");
@@ -140,23 +242,46 @@ export const sandboxWorker = new Worker(
         // 4. Start the Android Emulator Container
         const image = "budtmo/docker-android:emulator_9.0";
         logger.info(`Spawning Android Emulator container on port ${port}...`);
-        
+
         containerId = await startSandboxContainer(
           image,
           port,
           6080,
           [],
-          { 
-            DEVICE: "Samsung Galaxy S6", 
+          {
+            EMULATOR_DEVICE: "Samsung Galaxy S6",
+            WEB_VNC: "true",
             WEB_VNC_PORT: "6080",
             EMULATOR_ARGS: emulatorArgs
           },
           extraFlags
         );
 
+        logger.info(
+          `Android Emulator container started. ID=${containerId}`
+        );
+
+        exec(
+          `docker ps -a | grep ${containerId}`,
+          (_, stdout) => {
+            logger.info(
+              `[DOCKER STATUS]\n${stdout}`
+            );
+          }
+        );
+
+        exec(
+          `docker inspect ${containerId}`,
+          (_, stdout) => {
+            logger.info(
+              `[DOCKER INSPECT]\n${stdout}`
+            );
+          }
+        );
+
         // 5. Wait for emulator to complete boot
         logger.info(`Waiting for emulator to boot inside container ${containerId}...`);
-        await waitForEmulator(containerId, 900000);
+        await waitForEmulator(containerId, 300000);
 
         // 6. Install the APK
         logger.info(`Copying APK into emulator container...`);
@@ -168,14 +293,41 @@ export const sandboxWorker = new Worker(
         });
 
         logger.info(`Installing APK inside emulator...`);
+
         await new Promise<void>((resolve, reject) => {
-          exec(`docker exec ${containerId} adb -e install /tmp/app.apk`, (error, stdout, stderr) => {
-            if (error) reject(new Error(`Failed to install APK inside emulator: ${error.message}. Stderr: ${stderr}`));
-            else {
-              logger.info(`ADB install result: ${stdout.trim()}`);
-              resolve();
+          // Log connected devices before installation
+          exec(
+            `docker exec ${containerId} adb devices`,
+            (_, stdout, stderr) => {
+              logger.info(`[ADB BEFORE INSTALL]\n${stdout}`);
+
+              if (stderr) {
+                logger.warn(`[ADB BEFORE INSTALL STDERR]\n${stderr}`);
+              }
             }
-          });
+          );
+
+          // Install APK
+          exec(
+            `docker exec ${containerId} adb install -r /tmp/app.apk`,
+            (error, stdout, stderr) => {
+              logger.info(`[APK INSTALL STDOUT]\n${stdout}`);
+
+              if (stderr) {
+                logger.warn(`[APK INSTALL STDERR]\n${stderr}`);
+              }
+
+              if (error) {
+                reject(
+                  new Error(
+                    `Failed to install APK: ${error.message}`
+                  )
+                );
+              } else {
+                resolve();
+              }
+            }
+          );
         });
 
         // 7. Clean up local temp folder
@@ -190,7 +342,7 @@ export const sandboxWorker = new Worker(
         logger.info(`Cleaning up failed container: ${containerId}`);
         await stopSandboxContainer(containerId);
       }
-      
+
       session.status = "terminated";
       await session.save();
 
@@ -205,8 +357,8 @@ export const sandboxWorker = new Worker(
           await api.sendMessage(
             user.telegramId,
             `❌ <b>Sandbox Launch Failed</b>\n\n` +
-              `We could not boot your secure container environment.\n\n` +
-              `• <b>Reason:</b> <code>${escapeHtml(errorDetails)}</code>`,
+            `We could not boot your secure container environment.\n\n` +
+            `• <b>Reason:</b> <code>${escapeHtml(errorDetails)}</code>`,
             { parse_mode: "HTML" }
           );
         }
@@ -234,11 +386,11 @@ export const sandboxWorker = new Worker(
         await api.sendMessage(
           user.telegramId,
           `🚀 <b>Interactive Sandbox Ready!</b>\n\n` +
-            `You can now safely explore the target in your browser:\n` +
-            `👉 <a href="${sessionLink}">${sessionLink}</a>\n\n` +
-            `• <b>Target:</b> <code>${escapeHtml(inputValue)}</code>\n` +
-            `• <b>Duration:</b> <code>${config.sandbox.expiryMinutes} Minutes</code> (Hard cap)\n\n` +
-            `<i>The container will be automatically destroyed when the session expires.</i>`,
+          `You can now safely explore the target in your browser:\n` +
+          `👉 <a href="${sessionLink}">${sessionLink}</a>\n\n` +
+          `• <b>Target:</b> <code>${escapeHtml(inputValue)}</code>\n` +
+          `• <b>Duration:</b> <code>${config.sandbox.expiryMinutes} Minutes</code> (Hard cap)\n\n` +
+          `<i>The container will be automatically destroyed when the session expires.</i>`,
           { parse_mode: "HTML", link_preview_options: { is_disabled: true } }
         );
       }
