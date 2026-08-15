@@ -1,9 +1,9 @@
-name: Deploy to Oracle VM
+name: Production Deployment
 
 on:
   push:
     branches:
-      - prod # Change this if you deploy from a different branch (e.g. master, production)
+      - prod
 
 jobs:
   deploy:
