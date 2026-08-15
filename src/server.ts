@@ -9,9 +9,12 @@ import { resetAllUserCredits } from "./cron/resetCredits";
 import { queueSandboxCleanup } from "./cron/cleanupSandboxes";
 import { closeQueues } from "./queues";
 import SandboxSession from "./models/SandboxSession";
+import httpProxy from "http-proxy";
 
 const app = express();
 app.use(express.json());
+
+const proxy = httpProxy.createProxyServer({ ws: true });
 
 // Basic health check endpoint
 app.get("/health", (req, res) => {
@@ -44,11 +47,43 @@ app.get("/session/:token", async (req, res) => {
       return;
     }
 
-    const redirectUrl = `http://${req.hostname}:${session.port}`;
-    logger.info(`Redirecting session token [${token}] to VNC on ${redirectUrl}`);
-    res.redirect(redirectUrl);
+    res.redirect(`/sandbox/${token}/`);
   } catch (error) {
     logger.error(`Error redirecting session ${token}:`, error);
+    res.status(500).send("<h2>Internal Server Error</h2>");
+  }
+});
+
+// Proxy VNC HTTP requests
+app.all("/sandbox/:token*", async (req, res) => {
+  const token = (req.params as any).token;
+  try {
+    const session = await SandboxSession.findOne({
+      sessionToken: token,
+      status: "active",
+      expiresAt: { $gt: new Date() },
+    });
+
+    if (!session || !session.port) {
+      res.status(404).send(
+        `<h2>Session Expired or Not Found</h2>` +
+          `<p>The interactive sandbox session is no longer active.</p>`
+      );
+      return;
+    }
+
+    // Rewrite path to remove /sandbox/:token
+    req.url = req.url.replace(/^\/sandbox\/[a-zA-Z0-9_-]+/, "");
+    if (req.url === "") req.url = "/";
+
+    proxy.web(req, res, { target: `http://127.0.0.1:${session.port}` }, (err) => {
+      logger.error(`Proxy web error for session ${token}:`, err);
+      if (!res.headersSent) {
+        res.status(502).send("<h2>Proxy Error</h2><p>Failed to establish connection to the sandbox.</p>");
+      }
+    });
+  } catch (error) {
+    logger.error("Proxy middleware error:", error);
     res.status(500).send("<h2>Internal Server Error</h2>");
   }
 });
@@ -113,6 +148,35 @@ async function startServer() {
     // 2. Start Express server
     server = app.listen(config.port, () => {
       logger.info(`SecureBuddy API Server running on port ${config.port} in [${config.nodeEnv}] mode`);
+    });
+
+    // Handle WebSocket proxying for VNC connections
+    server.on("upgrade", async (req, socket, head) => {
+      const match = req.url?.match(/^\/sandbox\/([a-zA-Z0-9_-]+)/);
+      if (match) {
+        const token = match[1];
+        try {
+          const session = await SandboxSession.findOne({
+            sessionToken: token,
+            status: "active",
+            expiresAt: { $gt: new Date() },
+          });
+
+          if (session && session.port) {
+            // Rewrite path to remove /sandbox/:token
+            req.url = req.url!.replace(/^\/sandbox\/[a-zA-Z0-9_-]+/, "");
+            if (req.url === "") req.url = "/";
+
+            proxy.ws(req, socket, head, { target: `ws://127.0.0.1:${session.port}` }, (err) => {
+              logger.error(`Proxy WS error for session ${token}:`, err);
+            });
+            return;
+          }
+        } catch (error) {
+          logger.error("Proxy upgrade database query failed:", error);
+        }
+      }
+      socket.destroy();
     });
 
     // 4. Start Bot in Polling/Webhook Mode

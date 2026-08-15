@@ -157,6 +157,7 @@ ${escapedSummary}
         await bot.api.sendMessage(chatId, reportText, { parse_mode: "HTML" });
       }
 
+      logger.info("Sending VNC sandbox invitation message to user " + chatId);
       // Send VNC sandbox invitation message
       await bot.api.sendMessage(
         chatId,

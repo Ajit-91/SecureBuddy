@@ -1,0 +1,43 @@
+name: Deploy to Oracle VM
+
+on:
+  push:
+    branches:
+      - prod # Change this if you deploy from a different branch (e.g. master, production)
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Deploy via SSH
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.VM_IP }}
+          username: ${{ secrets.VM_USER }}
+          key: ${{ secrets.SSH_PRIVATE_KEY }}
+          port: 22
+          script: |
+            # 1. Navigate to the application directory (adjust path if you cloned it elsewhere)
+            cd /home/ubuntu/projects/SecureBuddy
+
+            # 2. Get current commit hash, then pull latest code
+            OLD_COMMIT=$(git rev-parse HEAD)
+            git pull origin main
+
+            # 3. Install new dependencies and rebuild the TypeScript project
+            npm install
+            npm run build
+
+            # 4. Rebuild Playwright docker image ONLY if files inside docker/url-analysis changed
+            if git diff --name-only $OLD_COMMIT HEAD | grep -q "^docker/url-analysis/"; then
+              echo "Changes detected in docker/url-analysis/. Rebuilding image..."
+              docker build -t securebuddy-url-analyzer:latest ./docker/url-analysis
+            else
+              echo "No changes in docker/url-analysis/. Skipping docker build."
+            fi
+
+            # 5. Restart server and worker processes via PM2 and reload environment variables
+            pm2 restart securebuddy-server --update-env
+            pm2 restart securebuddy-worker --update-env
+            
