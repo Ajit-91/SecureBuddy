@@ -38,6 +38,5 @@ jobs:
             fi
 
             # 5. Restart server and worker processes via PM2 and reload environment variables
-            pm2 restart securebuddy-server --update-env
-            pm2 restart securebuddy-worker --update-env
+            npm run prod:restart
             

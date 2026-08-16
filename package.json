@@ -9,7 +9,10 @@
     "dev": "ts-node-dev --respawn --transpile-only src/server.ts",
     "worker:dev": "ts-node-dev --respawn --transpile-only src/workerEntry.ts",
     "worker:start": "node dist/workerEntry.js",
-    "startdev": "start npm run dev && start npm run worker:dev"
+    "startdev": "start npm run dev && start npm run worker:dev",
+    "prod:start": "pm2 start dist/server.js --name securebuddy-server && pm2 start dist/workerEntry.js --name securebuddy-worker",
+    "prod:restart": "pm2 restart securebuddy-server --update-env && pm2 restart securebuddy-worker --update-env",
+    "prod:stop": "pm2 stop securebuddy-server && pm2 stop securebuddy-worker"
   },
   "keywords": [],
   "author": "",
