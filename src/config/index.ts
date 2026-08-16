@@ -25,6 +25,7 @@ export const config = {
   },
   system: {
     cronSecret: process.env.CRON_SECRET || "",
+    docsPassword: process.env.DOCS_PASSWORD || "",
   },
   sandbox: {
     expiryMinutes: parseInt(process.env.SANDBOX_EXPIRY_MINUTES || "60", 10),

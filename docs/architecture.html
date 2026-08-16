@@ -1,0 +1,275 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SecureBuddy - Technical Architecture Documentation</title>
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700;800;900&family=Plus+Jakarta+Sans:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --bg: #030712;
+            --primary: #6366f1;
+            --primary-glow: rgba(99, 102, 241, 0.15);
+            --primary-gradient: linear-gradient(135deg, #6366f1 0%, #8b5cf6 50%, #d946ef 100%);
+            --card-bg: rgba(17, 24, 39, 0.7);
+            --border: rgba(255, 255, 255, 0.08);
+            --text-main: #f9fafb;
+            --text-muted: #9ca3af;
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        body {
+            font-family: 'Plus Jakarta Sans', sans-serif;
+            background-color: var(--bg);
+            color: var(--text-main);
+            line-height: 1.6;
+            padding: 40px 20px;
+            background-image: 
+                radial-gradient(circle at 10% 20%, rgba(99, 102, 241, 0.1) 0%, transparent 40%),
+                radial-gradient(circle at 90% 80%, rgba(217, 70, 239, 0.05) 0%, transparent 40%);
+            background-attachment: fixed;
+        }
+
+        .container {
+            max-width: 1000px;
+            margin: 0 auto;
+        }
+
+        header {
+            margin-bottom: 50px;
+            border-bottom: 1px solid var(--border);
+            padding-bottom: 30px;
+        }
+
+        header h1 {
+            font-family: 'Outfit', sans-serif;
+            font-size: 2.5rem;
+            font-weight: 800;
+            background: var(--primary-gradient);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            margin-bottom: 8px;
+            letter-spacing: -0.03em;
+        }
+
+        header p {
+            color: var(--text-muted);
+            font-size: 1.1rem;
+        }
+
+        .section-card {
+            background: var(--card-bg);
+            border: 1px solid var(--border);
+            border-radius: 24px;
+            padding: 35px;
+            margin-bottom: 40px;
+            backdrop-filter: blur(12px);
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.3);
+        }
+
+        h2 {
+            font-family: 'Outfit', sans-serif;
+            font-size: 1.8rem;
+            font-weight: 700;
+            margin-bottom: 15px;
+            color: var(--text-main);
+            border-left: 4px solid var(--primary);
+            padding-left: 15px;
+        }
+
+        p {
+            color: var(--text-muted);
+            margin-bottom: 25px;
+            font-size: 1rem;
+        }
+
+        .mermaid-container {
+            background: #090d16;
+            border: 1px solid var(--border);
+            border-radius: 16px;
+            padding: 25px;
+            margin: 25px 0;
+            overflow-x: auto;
+        }
+
+        /* Responsive */
+        @media (max-width: 768px) {
+            body { padding: 20px 10px; }
+            .section-card { padding: 20px; }
+            header h1 { font-size: 2rem; }
+        }
+    </style>
+    <!-- Import Mermaid JS Library for dynamic diagram rendering -->
+    <script src="https://cdn.jsdelivr.net/npm/mermaid/dist/mermaid.min.js"></script>
+    <script>
+        mermaid.initialize({
+            startOnLoad: true,
+            theme: 'dark',
+            securityLevel: 'loose',
+            themeVariables: {
+                background: '#090d16',
+                primaryColor: '#6366f1',
+                primaryTextColor: '#f9fafb',
+                lineColor: '#818cf8',
+                textColor: '#f9fafb'
+            }
+        });
+    </script>
+</head>
+<body>
+
+<div class="container">
+    <header>
+        <h1>SecureBuddy Technical Architecture</h1>
+        <p>A comprehensive guide outlining the component architecture and data workflows inside SecureBuddy.</p>
+    </header>
+
+    <!-- Section 1: Overview -->
+    <section class="section-card">
+        <h2>1. High-Level System Architecture</h2>
+        <p>SecureBuddy uses a distributed, queue-based sandbox architecture built on Node.js, Docker, MongoDB, and Redis. It isolates dangerous actions (like navigating to sketchy URLs or running untrusted APKs) inside temporary, sandboxed Docker containers.</p>
+        
+        <div class="mermaid-container">
+            <div class="mermaid">
+            graph TD
+                User([Telegram User]) <-->|Message / Buttons| Bot[Grammy Bot Interface]
+                Bot -->|Enqueue Analysis Jobs| Redis[(Redis Broker)]
+                
+                subgraph Background Queue Workers
+                    Worker[BullMQ Worker Pool]
+                    Redis <--> Worker
+                    Worker -->|DB State Management| DB[(MongoDB)]
+                    Worker -->|Executes Sandbox| DockerHost[Docker Daemon]
+                end
+                
+                subgraph Isolated Containers
+                    DockerHost -->|URL Scan| Playwright[Playwright Analyzer]
+                    DockerHost -->|URL Sandbox| ChromiumVNC[Chromium noVNC Sandbox]
+                    DockerHost -->|APK Sandbox| AndroidKVM[Android Emulator Sandbox]
+                end
+                
+                Worker -->|Fetch/Analyze Payload| Playwright
+                Express[Express API Server] <-->|DB Verification| DB
+                Express <-->|Single-Port WS/HTTP Proxy| ChromiumVNC
+                Express <-->|Single-Port WS/HTTP Proxy| AndroidKVM
+                User <-->|HTTPS: Port 443| Caddy[Caddy Reverse Proxy] <-->|Port 3000| Express
+            </div>
+        </div>
+    </section>
+
+    <!-- Section 2: URL Threat Scan Flow -->
+    <section class="section-card">
+        <h2>2. URL Threat Scan Flow</h2>
+        <p>This flow is triggered when a user sends a website URL to the bot. It runs a headless Playwright scanner in a container, captures a screenshot, extracts findings, and summarizes the risk using Gemini.</p>
+        
+        <div class="mermaid-container">
+            <div class="mermaid">
+            sequenceDiagram
+                autonumber
+                actor User as Telegram User
+                participant Bot as Telegram Bot
+                participant Queue as BullMQ (Redis)
+                participant Worker as URL Worker
+                participant Docker as Playwright Container
+                participant AI as Gemini API
+                
+                User->>Bot: Sends URL
+                Bot->>Queue: Enqueues URL_ANALYSIS Job
+                Queue->>Worker: Dequeues Job
+                Worker->>Bot: Sends "Analysis Started" message
+                Worker->>Docker: Spawns Playwright Container
+                activate Docker
+                Docker->>Docker: Navigates to target URL
+                Docker->>Docker: Captures screenshot & result.json
+                Docker-->>Worker: Writes data to shared temp folder
+                deactivate Docker
+                Worker->>AI: Sends metadata, chain, & findings
+                AI-->>Worker: Returns AI Summary & Recommendations
+                Worker->>Bot: Uploads screenshot + Threat Report text
+                Worker->>Bot: Sends "🚀 Launch Sandbox" invitation button
+                Worker->>Worker: Deletes temp folder
+            </div>
+        </div>
+    </section>
+
+    <!-- Section 3: Interactive VNC Sandbox Flow -->
+    <section class="section-card">
+        <h2>3. Interactive VNC Sandbox Flow</h2>
+        <p>This flow allows users to interactively browse the URL inside a secure containerized browser, using our secure HTTP/WebSocket proxy on port 3000.</p>
+        
+        <div class="mermaid-container">
+            <div class="mermaid">
+            sequenceDiagram
+                autonumber
+                actor User as User Browser
+                participant Express as Express API Server
+                participant DB as MongoDB
+                participant Docker as Docker Host
+                participant VNC as Chromium VNC Container (Port 3000)
+                
+                User->>Express: GET /session/:token
+                Express->>DB: Verify active session token
+                DB-->>Express: Session active, local port is 49152
+                Express->>User: Redirects to /sandbox/:token/
+                
+                Note over User, Express: HTTP Reverse Proxying
+                User->>Express: GET /sandbox/:token/vnc.html
+                Express->>VNC: HTTP Proxy to 127.0.0.1:49152/vnc.html
+                VNC-->>Express: Returns HTML
+                Express-->>User: Serves HTML
+                
+                Note over User, Express: WebSocket Upgrade Proxying
+                User->>Express: WS /sandbox/:token/websockify (Upgrade)
+                Express->>DB: Verify session port
+                Express->>VNC: Upgrades socket connection to ws://127.0.0.1:49152/websockify
+                VNC-->>Express: WebSocket Tunnel Established
+                Express-->>User: WebSocket Tunnel Open (VNC Interactive Stream active!)
+            </div>
+        </div>
+    </section>
+
+    <!-- Section 4: APK Dynamic Analyzer Flow -->
+    <section class="section-card">
+        <h2>4. APK Dynamic Analyzer Flow</h2>
+        <p>This flow downloads an APK from Telegram, detects host KVM compatibility, starts an Android emulator container, installs the app, and opens a VNC tunnel.</p>
+        
+        <div class="mermaid-container">
+            <div class="mermaid">
+            sequenceDiagram
+                autonumber
+                actor User as Telegram User
+                participant Bot as Telegram Bot
+                participant Queue as BullMQ (Redis)
+                participant Worker as Sandbox Worker
+                participant Docker as Docker Host
+                participant Android as Android Container (Port 6080)
+                
+                User->>Bot: Uploads APK file
+                Bot->>Queue: Enqueues Sandbox Creation Job
+                Queue->>Worker: Dequeues Job
+                Worker->>Worker: Downloads APK file from Telegram API
+                Worker->>Docker: Checks `/dev/kvm` availability inside Docker
+                alt KVM Available
+                    Worker->>Docker: Spawn Android container with --device /dev/kvm
+                else No KVM
+                    Worker->>Docker: Fallback to Chromium VNC Container (URL mock mode)
+                end
+                activate Android
+                Worker->>Android: Poll getprop sys.boot_completed until "1" (5 min timeout)
+                Worker->>Android: Copy APK: docker cp app.apk container:/tmp/app.apk
+                Worker->>Android: Install: docker exec adb install /tmp/app.apk
+                deactivate Android
+                Worker->>Bot: Sends "Interactive Sandbox Ready" Telegram message with session link
+                Worker->>Worker: Clean up temporary files
+            </div>
+        </div>
+    </section>
+</div>
+
+</body>
+</html>

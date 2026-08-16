@@ -1,0 +1,402 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SecureBuddy Deployment & Networking Guide</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600&family=Outfit:wght@400;600;700;800&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --bg-color: #080b16;
+            --card-bg: rgba(17, 22, 43, 0.7);
+            --border-color: rgba(99, 102, 241, 0.15);
+            --border-glow: rgba(99, 102, 241, 0.4);
+            --primary: #6366f1;
+            --primary-gradient: linear-gradient(135deg, #6366f1 0%, #a855f7 100%);
+            --emerald: #10b981;
+            --amber: #f59e0b;
+            --rose: #f43f5e;
+            --text-main: #f3f4f6;
+            --text-muted: #9ca3af;
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: var(--bg-color);
+            color: var(--text-main);
+            line-height: 1.6;
+            padding: 40px 20px;
+            background-image: 
+                radial-gradient(at 0% 0%, rgba(99, 102, 241, 0.1) 0px, transparent 50%),
+                radial-gradient(at 100% 100%, rgba(168, 85, 247, 0.08) 0px, transparent 50%);
+            background-attachment: fixed;
+        }
+
+        .container {
+            max-width: 1100px;
+            margin: 0 auto;
+        }
+
+        header {
+            text-align: center;
+            margin-bottom: 50px;
+        }
+
+        header h1 {
+            font-family: 'Outfit', sans-serif;
+            font-size: 2.8rem;
+            font-weight: 800;
+            background: var(--primary-gradient);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            margin-bottom: 12px;
+            letter-spacing: -0.03em;
+        }
+
+        header p {
+            color: var(--text-muted);
+            font-size: 1.1rem;
+            max-width: 600px;
+            margin: 0 auto;
+        }
+
+        /* Interactive Tabs */
+        .tabs {
+            display: flex;
+            justify-content: center;
+            gap: 10px;
+            margin-bottom: 40px;
+            flex-wrap: wrap;
+        }
+
+        .tab-btn {
+            background: var(--card-bg);
+            border: 1px solid var(--border-color);
+            color: var(--text-muted);
+            padding: 12px 24px;
+            border-radius: 30px;
+            cursor: pointer;
+            font-family: 'Outfit', sans-serif;
+            font-weight: 600;
+            font-size: 0.95rem;
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+
+        .tab-btn:hover {
+            border-color: var(--primary);
+            color: var(--text-main);
+            transform: translateY(-2px);
+        }
+
+        .tab-btn.active {
+            background: var(--primary-gradient);
+            border-color: transparent;
+            color: white;
+            box-shadow: 0 4px 15px rgba(99, 102, 241, 0.4);
+        }
+
+        .tab-content {
+            display: none;
+            animation: fadeIn 0.5s ease;
+        }
+
+        .tab-content.active {
+            display: block;
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(15px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        /* Glassmorphic Cards */
+        .card {
+            background: var(--card-bg);
+            border: 1px solid var(--border-color);
+            border-radius: 20px;
+            padding: 35px;
+            backdrop-filter: blur(12px);
+            margin-bottom: 30px;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.3);
+            transition: border-color 0.3s ease;
+        }
+
+        .card:hover {
+            border-color: var(--border-glow);
+        }
+
+        h2 {
+            font-family: 'Outfit', sans-serif;
+            font-size: 1.8rem;
+            font-weight: 600;
+            margin-bottom: 20px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .section-icon {
+            font-size: 2rem;
+        }
+
+        p {
+            margin-bottom: 15px;
+            color: #d1d5db;
+        }
+
+        /* Visual Diagrams */
+        .diagram-container {
+            background: rgba(8, 10, 20, 0.8);
+            border: 1px dashed var(--border-color);
+            border-radius: 12px;
+            padding: 30px;
+            margin: 25px 0;
+            display: flex;
+            justify-content: space-around;
+            align-items: center;
+            flex-wrap: wrap;
+            gap: 15px;
+        }
+
+        .node {
+            background: var(--card-bg);
+            border: 2px solid var(--border-color);
+            border-radius: 10px;
+            padding: 15px 25px;
+            text-align: center;
+            font-family: 'Outfit', sans-serif;
+            font-weight: 600;
+            min-width: 140px;
+            position: relative;
+            box-shadow: 0 4px 10px rgba(0,0,0,0.2);
+        }
+
+        .node.highlight {
+            border-color: var(--primary);
+            box-shadow: 0 0 15px var(--border-glow);
+        }
+
+        .node.success {
+            border-color: var(--emerald);
+        }
+
+        .node-subtitle {
+            font-size: 0.75rem;
+            color: var(--text-muted);
+            font-weight: 400;
+            margin-top: 4px;
+        }
+
+        .arrow {
+            color: var(--primary);
+            font-size: 1.5rem;
+            font-weight: bold;
+        }
+
+        /* Code Block Panel */
+        pre {
+            background: #04060c;
+            border: 1px solid var(--border-color);
+            padding: 20px;
+            border-radius: 10px;
+            overflow-x: auto;
+            margin: 15px 0;
+        }
+
+        code {
+            font-family: 'Courier New', Courier, monospace;
+            color: var(--emerald);
+            font-size: 0.95rem;
+        }
+
+        .highlight-text {
+            color: var(--primary);
+            font-weight: 600;
+        }
+
+        /* Grid Layout */
+        .grid-2 {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 20px;
+            margin-top: 20px;
+        }
+
+        .bullet-list {
+            list-style: none;
+            margin-left: 5px;
+        }
+
+        .bullet-list li {
+            position: relative;
+            padding-left: 25px;
+            margin-bottom: 12px;
+        }
+
+        .bullet-list li::before {
+            content: "✦";
+            position: absolute;
+            left: 0;
+            color: var(--primary);
+        }
+
+        /* Visual indicator */
+        .pill {
+            display: inline-block;
+            padding: 4px 10px;
+            border-radius: 12px;
+            font-size: 0.75rem;
+            font-weight: 600;
+            text-transform: uppercase;
+            margin-right: 8px;
+        }
+        .pill-blue { background: rgba(99, 102, 241, 0.2); color: #818cf8; }
+        .pill-green { background: rgba(16, 185, 129, 0.2); color: #34d399; }
+        .pill-red { background: rgba(244, 63, 94, 0.2); color: #fb7185; }
+
+        @media (max-width: 768px) {
+            body { padding: 20px 10px; }
+            .card { padding: 20px; }
+            .diagram-container { flex-direction: column; }
+            .arrow { transform: rotate(90deg); margin: 5px 0; }
+        }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <header>
+        <h1>SecureBuddy Networking & Deployment</h1>
+        <p>An interactive, simplified breakdown of cloud server deployment, firewalls, and reverse proxying.</p>
+    </header>
+
+    <!-- Tabs Navigation -->
+    <div class="tabs">
+        <button class="tab-btn active" onclick="switchTab(event, 'tab-http')">HTTP vs HTTPS</button>
+        <button class="tab-btn" onclick="switchTab(event, 'tab-proxy')">Reverse Proxy & Caddy</button>
+        <button class="tab-btn" onclick="switchTab(event, 'tab-firewall')">Firewalls & Ingress</button>
+    </div>
+
+    <!-- Tab 1: HTTP vs HTTPS -->
+    <div id="tab-http" class="tab-content active">
+        <div class="card">
+            <h2><span class="section-icon">🔒</span> HTTP vs HTTPS & SSL Decrypted</h2>
+            <p>At their core, HTTP and HTTPS are languages used to send data back and forth between a browser and a server. The critical difference is **safety**.</p>
+            
+            <div class="grid-2">
+                <div class="card" style="margin-bottom:0; background: rgba(244, 63, 94, 0.05); border-color: rgba(244, 63, 94, 0.1);">
+                    <h3><span class="pill pill-red">HTTP (Port 80)</span></h3>
+                    <p style="margin-top: 10px;">Data is sent in <strong>clear text</strong>. Anyone intercepting the packets (like a hacker on public Wi-Fi) can see passwords, tokens, and stream contents.</p>
+                </div>
+                <div class="card" style="margin-bottom:0; background: rgba(16, 185, 129, 0.05); border-color: rgba(16, 185, 129, 0.1);">
+                    <h3><span class="pill pill-green">HTTPS (Port 443)</span></h3>
+                    <p style="margin-top: 10px;">Data is fully <strong>encrypted</strong> using SSL/TLS. Even if intercepted, it looks like random gibberish. Web Browsers require this context for sensitive features.</p>
+                </div>
+            </div>
+
+            <div class="diagram-container">
+                <div class="node">Browser</div>
+                <div class="arrow">───►</div>
+                <div class="node highlight" style="border-color: var(--primary);">SSL Encryption Shield<div class="node-subtitle">TLS Handshake</div></div>
+                <div class="arrow">───►</div>
+                <div class="node success">Secure Server</div>
+            </div>
+
+            <h3 style="margin-top: 25px; margin-bottom: 10px; font-family: 'Outfit';">What is SSL/TLS and why did Selkies complain?</h3>
+            <p>SSL (Secure Sockets Layer) is the protocol that performs the encryption. To enable it, a trusted authority (like Let's Encrypt) issues a digital "Certificate" verifying your server's identity.</p>
+            <p><strong>Why Selkies failed initially:</strong> Modern browsers block critical features (like clipboard capture, pointer lock, and audio streaming) unless they detect a <em>Secure Context</em> (HTTPS). Serving the sandbox over `http://<IP>` caused the browser's JavaScript to throw an error and refuse to connect.</p>
+        </div>
+    </div>
+
+    <!-- Tab 2: Reverse Proxy & Caddy -->
+    <div id="tab-proxy" class="tab-content">
+        <div class="card">
+            <h2><span class="section-icon">🔀</span> What is a Reverse Proxy & Caddy?</h2>
+            <p>When you run SecureBuddy, it runs on port `3000`. We don't want to expose port `3000` directly because it doesn't have SSL capabilities built into it natively. Instead, we use a **Reverse Proxy**.</p>
+            
+            <p>A reverse proxy acts like a gatekeeper receptionist sitting at the entrance (port 80/443). It receives HTTPS requests, handles the encryption handshake, and then quietly forwards the traffic internally to your Node.js application.</p>
+
+            <div class="diagram-container">
+                <div class="node">User Browser<div class="node-subtitle">https://securebuddy.org</div></div>
+                <div class="arrow">──►</div>
+                <div class="node highlight">Caddy Web Server<div class="node-subtitle">Listening: 443 (SSL)</div></div>
+                <div class="arrow">──►</div>
+                <div class="node success">Node API<div class="node-subtitle">Internal: 3000 (HTTP)</div></div>
+            </div>
+
+            <h3 style="margin-top: 25px; margin-bottom: 10px; font-family: 'Outfit';">Understanding the Caddyfile Configuration</h3>
+            <p>In step 3, we wrote a short block of code into `/etc/caddy/Caddyfile`:</p>
+            <pre><code>securebuddy.duckdns.org {
+    reverse_proxy localhost:3000
+}</code></pre>
+            
+            <p>Here is what this means line by line:</p>
+            <ul class="bullet-list">
+                <li><span class="highlight-text">securebuddy.duckdns.org</span>: Tells Caddy to listen for requests specifically meant for this domain name. It automatically contacts Let's Encrypt to download a free SSL certificate for this domain.</li>
+                <li><span class="highlight-text">reverse_proxy localhost:3000</span>: Instructs Caddy to take any requests hitting that domain on port 80/443, strip/handle the SSL encryption, and pass the clean traffic to your Node app running locally on port `3000`.</li>
+            </ul>
+        </div>
+    </div>
+
+    <!-- Tab 3: Firewalls & Ingress -->
+    <div id="tab-firewall" class="tab-content">
+        <div class="card">
+            <h2><span class="section-icon">🛡️</span> The Double-Lock Firewall</h2>
+            <p>For security, cloud networks use a **two-layered security design** to lock down ports. A packet coming from the internet must pass through both locks to reach your app.</p>
+            
+            <div class="grid-2">
+                <div class="card" style="margin-bottom:0;">
+                    <h3>Lock 1: Oracle Ingress Rules<br><span class="node-subtitle">External Network Shield</span></h3>
+                    <p style="margin-top: 10px;">This is a firewall hosted by Oracle Cloud <strong>outside</strong> your server. If you don't open ports 80/443 here, the packet is blocked before it even touches your virtual machine.</p>
+                </div>
+                <div class="card" style="margin-bottom:0;">
+                    <h3>Lock 2: Local VM iptables<br><span class="node-subtitle">Internal Server Gatekeeper</span></h3>
+                    <p style="margin-top: 10px;">This is a software firewall running <strong>inside</strong> your Ubuntu VM OS. Ubuntu drops all traffic unless an explicit rule allows it.</p>
+                </div>
+            </div>
+
+            <h3 style="margin-top: 25px; margin-bottom: 10px; font-family: 'Outfit';">Understanding the `iptables` Command</h3>
+            <p>To open ports inside your Ubuntu OS, we ran these commands:</p>
+            <pre><code>sudo iptables -I INPUT -p tcp --dport 80 -j ACCEPT
+sudo iptables -I INPUT -p tcp --dport 443 -j ACCEPT
+sudo netfilter-persistent save</code></pre>
+
+            <ul class="bullet-list">
+                <li><span class="highlight-text">-I INPUT</span>: Inserts the rule at the <strong>very top</strong> of the incoming packet rules. This is crucial because Oracle VM images have a drop rule at the bottom; inserting at the top ensures the permit rule is evaluated first.</li>
+                <li><span class="highlight-text">-p tcp --dport 80</span>: Matches incoming TCP traffic destined for port 80 (HTTP).</li>
+                <li><span class="highlight-text">-j ACCEPT</span>: Accepts/allows the packet.</li>
+                <li><span class="highlight-text">netfilter-persistent save</span>: Saves the rules to disk so they are not wiped out when the VM reboots.</li>
+            </ul>
+        </div>
+    </div>
+
+</div>
+
+<script>
+    function switchTab(evt, tabId) {
+        // Hide all tab contents
+        const tabContents = document.getElementsByClassName("tab-content");
+        for (let i = 0; i < tabContents.length; i++) {
+            tabContents[i].classList.remove("active");
+        }
+
+        // Deactivate all tab buttons
+        const tabBtns = document.getElementsByClassName("tab-btn");
+        for (let i = 0; i < tabBtns.length; i++) {
+            tabBtns[i].classList.remove("active");
+        }
+
+        // Show selected tab content and add active class to clicked button
+        document.getElementById(tabId).classList.add("active");
+        evt.currentTarget.classList.add("active");
+    }
+</script>
+
+</body>
+</html>

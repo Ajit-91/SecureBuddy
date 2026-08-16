@@ -10,9 +10,15 @@ import { queueSandboxCleanup } from "./cron/cleanupSandboxes";
 import { closeQueues } from "./queues";
 import SandboxSession from "./models/SandboxSession";
 import httpProxy from "http-proxy";
+import fs from "fs";
+import path from "path";
+import { docsAuthMiddleware } from "./middlewares/docsAuth.middleware";
 
 const app = express();
 app.use(express.json());
+
+// Serve docs folder statically under the /docs route (password protected)
+app.use("/docs", docsAuthMiddleware, express.static(path.join(__dirname, "../docs")));
 
 const proxy = httpProxy.createProxyServer({ ws: true });
 
@@ -89,7 +95,20 @@ app.all("/sandbox/:token*", async (req, res) => {
 });
 
 app.get("/", (req, res) => {
-  res.status(200).send("SecureBuddy API Server");
+  try {
+    const htmlPath = path.join(__dirname, "../public/index.html");
+    if (fs.existsSync(htmlPath)) {
+      let htmlContent = fs.readFileSync(htmlPath, "utf-8");
+      const botUsername = bot.botInfo?.username || "SecureBuddyBot";
+      htmlContent = htmlContent.replace(/{{BOT_USERNAME}}/g, botUsername);
+      res.send(htmlContent);
+    } else {
+      res.status(200).send("SecureBuddy API Server");
+    }
+  } catch (error) {
+    logger.error("Error serving landing page:", error);
+    res.status(500).send("Internal Server Error");
+  }
 });
 
 // Configure Bot Delivery Mode
