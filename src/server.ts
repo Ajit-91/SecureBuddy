@@ -99,7 +99,12 @@ app.get("/", (req, res) => {
     const htmlPath = path.join(__dirname, "../public/index.html");
     if (fs.existsSync(htmlPath)) {
       let htmlContent = fs.readFileSync(htmlPath, "utf-8");
-      const botUsername = bot.botInfo?.username || "SecureBuddyBot";
+      let botUsername = "SecureBuddyBot";
+      try {
+        botUsername = bot.botInfo.username;
+      } catch (e) {
+        // Bot not initialized yet, fallback to placeholder
+      }
       htmlContent = htmlContent.replace(/{{BOT_USERNAME}}/g, botUsername);
       res.send(htmlContent);
     } else {
